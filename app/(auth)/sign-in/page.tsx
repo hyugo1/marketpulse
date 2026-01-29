@@ -7,7 +7,7 @@ import FooterLink from "@/components/forms/FooterLink";
 import {signInWithEmail, signUpWithEmail, SignInResult, resendVerificationEmail} from "@/lib/actions/auth.actions";
 import {toast} from "sonner";
 import {useRouter} from "next/navigation";
-import { AlertCircle, ArrowRight, HelpCircle, Key, Lock, Mail, RefreshCw, WifiOff, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowRight, Key, Lock, Mail, RefreshCw, WifiOff, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 const showEnhancedErrorToast = (result: SignInResult, router: any, onResendEmail: (email: string) => Promise<{ success: boolean; error?: string }>) => {
@@ -63,11 +63,20 @@ const showEnhancedErrorToast = (result: SignInResult, router: any, onResendEmail
     const getActionButton = () => {
         switch (errorCode) {
             case 'invalid_credentials':
-            case 'invalid_password':
                 return (
                     <button
                         onClick={() => router.push('/forgot-password')}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors"
+                    >
+                        <Key className="size-3.5" />
+                        Forgot Password?
+                    </button>
+                );
+            case 'invalid_password':
+                return (
+                    <button
+                        onClick={() => router.push('/forgot-password')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 rounded-md transition-colors"
                     >
                         <Key className="size-3.5" />
                         Forgot Password?
@@ -100,11 +109,11 @@ const showEnhancedErrorToast = (result: SignInResult, router: any, onResendEmail
             default:
                 return (
                     <button
-                        onClick={() => router.push('/contact')}
+                        onClick={() => router.push('/forgot-password')}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-400 hover:text-gray-300 hover:bg-gray-500/10 rounded-md transition-colors"
                     >
-                        <HelpCircle className="size-3.5" />
-                        Contact Support
+                        <Key className="size-3.5" />
+                        Forgot Password?
                     </button>
                 );
         }
@@ -220,6 +229,8 @@ function ResendEmailButton({ onResend }: { onResend: (email: string) => Promise<
     );
 }
 
+import Link from "next/link"
+
 const SignIn = () => {
     const router = useRouter()
   const {
@@ -320,7 +331,13 @@ const onPasswordBlur = (e: React.FocusEvent<HTMLInputElement>) => {
           {isSubmitting ? 'Signing In' : 'Sign In'}
         </Button>
 
-            <FooterLink text="Don't have an account?" linkText="Create an account" href="/sign-up" />
+            <div className="flex items-center justify-center gap-6 pt-4">
+                <span className="text-sm text-gray-500">Don't have an <Link href="/sign-up" className="text-sm text-blue-500 hover:text-blue-400 transition-colors">account</Link>?</span>
+                <span className="text-gray-600">|</span>
+                <Link href="/forgot-password" className="text-sm text-gray-500 hover:text-gray-400 transition-colors">
+                    Forgot password?
+                </Link>
+            </div>
       </form>
     </>
   );
