@@ -32,8 +32,8 @@ export const getAuth = async () => {
                 const tokenMatch = url.match(/\/api\/auth\/reset-password\/([^?]+)/);
                 const token = tokenMatch ? tokenMatch[1] : null;
                 
-                // Get the base URL from the original URL or use NEXT_PUBLIC_APP_URL
-                const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://marketpulse-taupe.vercel.app";
+                // Get the base URL from the original URL
+                const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
                 
                 const frontendResetUrl = token 
                     ? `${baseUrl}/reset-password?token=${token}`
