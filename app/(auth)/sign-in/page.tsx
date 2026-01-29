@@ -9,6 +9,7 @@ import {toast} from "sonner";
 import {useRouter} from "next/navigation";
 import { AlertCircle, ArrowRight, Key, Lock, Mail, RefreshCw, WifiOff, Loader2 } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link"
 
 const showEnhancedErrorToast = (result: SignInResult, router: any, onResendEmail: (email: string) => Promise<{ success: boolean; error?: string }>) => {
     const { errorCode, error, suggestedAction } = result;
@@ -229,8 +230,6 @@ function ResendEmailButton({ onResend }: { onResend: (email: string) => Promise<
     );
 }
 
-import Link from "next/link"
-
 const SignIn = () => {
     const router = useRouter()
   const {
@@ -334,7 +333,7 @@ const onPasswordBlur = (e: React.FocusEvent<HTMLInputElement>) => {
             <div className="flex items-center justify-center gap-6 pt-4">
                 <span className="text-sm text-gray-500">Don't have an <Link href="/sign-up" className="text-sm text-blue-500 hover:text-blue-400 transition-colors">account</Link>?</span>
                 <span className="text-gray-600">|</span>
-                <Link href="/forgot-password" className="text-sm text-gray-500 hover:text-gray-400 transition-colors">
+                <Link href="/forgot-password" className="text-sm text-blue-500 hover:text-blue-400 transition-colors">
                     Forgot password?
                 </Link>
             </div>
