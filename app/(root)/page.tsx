@@ -2,6 +2,9 @@
 
 import useTradingViewWidget from '@/hooks/useTradingViewWidget';
 import { memo } from 'react';
+import TradingViewWidget from "@/components/TradingViewWidget"
+import TradingViewScreenerWidget from "@/components/TradingViewScreenerWidget"
+import TopMovers from "@/components/TopMovers"
 
 import { MARKET_OVERVIEW_WIDGET_CONFIG, 
   STOCK_HEATMAP_WIDGET_CONFIG,
@@ -34,8 +37,6 @@ function TickerTapeWidget() {
 
 const MemoizedTickerTape = memo(TickerTapeWidget);
 
-import TradingViewWidget from "@/components/TradingViewWidget"
-import TradingViewScreenerWidget from "@/components/TradingViewScreenerWidget"
 
 const Home = () => {
   const scripturl = "https://s3.tradingview.com/external-embedding/embed-widget-";
@@ -45,6 +46,11 @@ const Home = () => {
       <div className="w-full pt-4">
         <MemoizedTickerTape />
       </div>
+
+      {/* Quick market snapshot */}
+      <section className="w-full gap-8 home-section">
+        <TopMovers />
+      </section>
 
       {/* First row: Market Overview and Stock Heatmap */}
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 w-full gap-8 home-section">
