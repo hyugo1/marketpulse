@@ -34,7 +34,7 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
 
     const maxArticles = 6;
 
-    // If we have symbols, try to fetch company news per symbol and round-robin select
+    // Try to fetch company news per symbol and round-robin select
     if (cleanSymbols.length > 0) {
       const perSymbolArticles: Record<string, RawNewsArticle[]> = {};
 
@@ -101,7 +101,6 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
   try {
     const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
     if (!token) {
-      // If no token, log and return empty to avoid throwing per requirements
       console.error('Error in stock search:', new Error('FINNHUB API key is not configured'));
       return [];
     }
@@ -139,10 +138,7 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
             displaySymbol: symbol,
             type: 'Common Stock',
           };
-          // We don't include exchange in FinnhubSearchResult type, so carry via mapping later using profile
-          // To keep pipeline simple, attach exchange via closure map stage
-          // We'll reconstruct exchange when mapping to final type
-          (r as any).__exchange = exchange; // internal only
+          (r as any).__exchange = exchange; 
           return r;
         })
         .filter((x): x is FinnhubSearchResult => Boolean(x));
@@ -156,9 +152,7 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
       .map((r) => {
         const upper = (r.symbol || '').toUpperCase();
         const name = r.description || upper;
-        // const exchangeFromDisplay = (r.displaySymbol as string | undefined) || undefined;
         const exchangeFromProfile = (r as any).__exchange as string | undefined;
-        // const exchange = exchangeFromDisplay || exchangeFromProfile || 'US';
         const exchange = exchangeFromProfile || 'US';
         const type = r.type || 'Stock';
         const item: StockWithWatchlistStatus = {
@@ -180,4 +174,44 @@ export const searchStocks = cache(async (query?: string): Promise<StockWithWatch
     console.error('Error in stock search:', err);
     return [];
   }
+});
+export interface TopMover {
+  symbol: string;
+  price: number;
+  changePercent: number;
+}
+
+export interface TopMoversResponse {
+  gainers: TopMover[];
+  losers: TopMover[];
+  updatedAt: number;
+}
+
+export const getTopMovers = cache(async (): Promise<TopMoversResponse> => {
+  const token = process.env.FINNHUB_API_KEY ?? process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+  if (!token) return { gainers: [], losers: [], updatedAt: Date.now() };
+
+  const symbols = POPULAR_STOCK_SYMBOLS.slice(0, 15);
+
+  const quotes = await Promise.all(
+    symbols.map(async (symbol) => {
+      try {
+        const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`;
+        const q = await fetchJSON<{ c?: number; dp?: number }>(url, 300);
+        if (typeof q?.c !== "number" || typeof q?.dp !== "number") return null;
+        return { symbol, price: q.c, changePercent: q.dp };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const valid = quotes.filter((x): x is TopMover => Boolean(x));
+  const sorted = [...valid].sort((a, b) => b.changePercent - a.changePercent);
+
+  return {
+    gainers: sorted.slice(0, 5),
+    losers: [...sorted].reverse().slice(0, 5),
+    updatedAt: Date.now(),
+  };
 });

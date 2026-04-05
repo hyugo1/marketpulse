@@ -7,11 +7,32 @@ import { generateUnsubscribeToken, verifyUnsubscribeToken } from "@/lib/unsubscr
 
 export { generateUnsubscribeToken, verifyUnsubscribeToken };
 
+const getDb = async () => {
+    const mongoose = await connectToDatabase();
+    const db = mongoose.connection.db;
+    if (!db) throw new Error('Mongoose connection not connected');
+    return db;
+};
+
+const getCurrentSessionEmail = async (): Promise<string | null> => {
+    const session = await auth.api.getSession({ headers: await headers() });
+    return session?.user?.email ?? null;
+};
+
+const updateUserByEmail = async (email: string, fields: Record<string, unknown>): Promise<boolean> => {
+    const db = await getDb();
+
+    const result = await db.collection('user').updateOne(
+        { email },
+        { $set: { ...fields, updatedAt: new Date() } }
+    );
+
+    return result.matchedCount > 0;
+};
+
 export const getUserByEmail = async (email: string) => {
     try {
-        const mongoose = await connectToDatabase();
-        const db = mongoose.connection.db;
-        if (!db) throw new Error('Mongoose connection not connected');
+        const db = await getDb();
 
         const user = await db.collection('user').findOne(
             { email: { $exists: true, $ne: null, $eq: email } }
@@ -26,10 +47,10 @@ export const getUserByEmail = async (email: string) => {
 
 export const getCurrentUserSubscriptionStatus = async (): Promise<boolean | null> => {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user?.email) return null;
+        const email = await getCurrentSessionEmail();
+        if (!email) return null;
         
-        const user = await getUserByEmail(session.user.email);
+        const user = await getUserByEmail(email);
         return user?.emailSubscribed ?? true; 
     } catch (e) {
         console.error('Error getting subscription status:', e);
@@ -39,17 +60,11 @@ export const getCurrentUserSubscriptionStatus = async (): Promise<boolean | null
 
 export const toggleEmailSubscription = async (subscribed: boolean): Promise<boolean> => {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user?.email) return false;
-        
-        const mongoose = await connectToDatabase();
-        const db = mongoose.connection.db;
-        if (!db) throw new Error('Mongoose connection not connected');
-        
-        await db.collection('user').updateOne(
-            { email: session.user.email },
-            { $set: { emailSubscribed: subscribed, updatedAt: new Date() } }
-        );
+        const email = await getCurrentSessionEmail();
+        if (!email) return false;
+
+        const updated = await updateUserByEmail(email, { emailSubscribed: subscribed });
+        if (!updated) return false;
         
         return true;
     } catch (e) {
@@ -60,14 +75,8 @@ export const toggleEmailSubscription = async (subscribed: boolean): Promise<bool
 
 export const unsubscribeByEmail = async (email: string): Promise<boolean> => {
     try {
-        const mongoose = await connectToDatabase();
-        const db = mongoose.connection.db;
-        if (!db) throw new Error('Mongoose connection not connected');
-        
-        await db.collection('user').updateOne(
-            { email: email },
-            { $set: { emailSubscribed: false, updatedAt: new Date() } }
-        );
+        const updated = await updateUserByEmail(email, { emailSubscribed: false });
+        if (!updated) return false;
         
         return true;
     } catch (e) {
@@ -78,14 +87,8 @@ export const unsubscribeByEmail = async (email: string): Promise<boolean> => {
 
 export const subscribeByEmail = async (email: string): Promise<boolean> => {
     try {
-        const mongoose = await connectToDatabase();
-        const db = mongoose.connection.db;
-        if (!db) throw new Error('Mongoose connection not connected');
-        
-        await db.collection('user').updateOne(
-            { email: email },
-            { $set: { emailSubscribed: true, updatedAt: new Date() } }
-        );
+        const updated = await updateUserByEmail(email, { emailSubscribed: true });
+        if (!updated) return false;
         
         return true;
     } catch (e) {
@@ -96,9 +99,7 @@ export const subscribeByEmail = async (email: string): Promise<boolean> => {
 
 export const getAllUsersForNewsEmail = async () => {
     try {
-        const mongoose = await connectToDatabase();
-        const db = mongoose.connection.db;
-        if(!db) throw new Error('Mongoose connection not connected');
+        const db = await getDb();
 
         const users = await db.collection('user').find(
             { 
@@ -121,17 +122,11 @@ export const getAllUsersForNewsEmail = async () => {
 
 export const updateProfileImage = async (imageUrl: string): Promise<boolean> => {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user?.email) return false;
-        
-        const mongoose = await connectToDatabase();
-        const db = mongoose.connection.db;
-        if (!db) throw new Error('Mongoose connection not connected');
-        
-        await db.collection('user').updateOne(
-            { email: session.user.email },
-            { $set: { image: imageUrl, updatedAt: new Date() } }
-        );
+        const email = await getCurrentSessionEmail();
+        if (!email) return false;
+
+        const updated = await updateUserByEmail(email, { image: imageUrl });
+        if (!updated) return false;
         
         return true;
     } catch (e) {
@@ -142,15 +137,13 @@ export const updateProfileImage = async (imageUrl: string): Promise<boolean> => 
 
 export const deleteAccount = async (): Promise<{ success: boolean; error?: string }> => {
     try {
-        const session = await auth.api.getSession({ headers: await headers() });
-        if (!session?.user?.email) return { success: false, error: 'Not authenticated' };
+        const email = await getCurrentSessionEmail();
+        if (!email) return { success: false, error: 'Not authenticated' };
 
-        const mongoose = await connectToDatabase();
-        const db = mongoose.connection.db;
-        if (!db) throw new Error('Mongoose connection not connected');
+        const db = await getDb();
 
         // Get user by email to get the _id
-        const user = await db.collection('user').findOne({ email: session.user.email });
+        const user = await db.collection('user').findOne({ email });
         
         if (!user) {
             return { success: false, error: 'User not found' };

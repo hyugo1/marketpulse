@@ -5,11 +5,27 @@ import { Watchlist } from '@/database/models/watchlist.model';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
 
-// Helper function to mask email for logging
-const maskEmail = (email: string): string => {
-  if (!email || !email.includes('@')) return '***';
-  const [local, domain] = email.split('@');
-  return `${local.substring(0, 2)}***@${domain}`;
+type DbUser = { _id?: unknown; id?: string; email?: string };
+
+const getDb = async () => {
+  const mongoose = await connectToDatabase();
+  const db = mongoose.connection.db;
+  if (!db) throw new Error('MongoDB connection not found');
+  return db;
+};
+
+const getCurrentSessionEmail = async (): Promise<string | null> => {
+  const session = await auth.api.getSession({ headers: await headers() });
+  return session?.user?.email ?? null;
+};
+
+const getUserIdByEmail = async (email: string): Promise<string | null> => {
+  const db = await getDb();
+  const user = await db.collection('user').findOne<DbUser>({ email });
+  if (!user) return null;
+
+  const userId = (user.id as string) || String(user._id || '');
+  return userId || null;
 };
 
 // Helper function to validate stock symbol format
@@ -34,17 +50,7 @@ export async function getWatchlistSymbolsByEmail(email: string): Promise<string[
   if (!email) return [];
 
   try {
-    // No longer logging email to prevent PII leakage
-    const mongoose = await connectToDatabase();
-    const db = mongoose.connection.db;
-    if (!db) throw new Error('MongoDB connection not found');
-
-    const user = await db.collection('user').findOne<{ _id?: unknown; id?: string; email?: string }>({ email });
-    if (!user) {
-      return [];
-    }
-
-    const userId = (user.id as string) || String(user._id || '');
+    const userId = await getUserIdByEmail(email);
     if (!userId) return [];
 
     const items = await Watchlist.find({ userId }, { symbol: 1 }).lean();
@@ -59,9 +65,7 @@ export async function getWatchlistSymbolsByEmail(email: string): Promise<string[
 // Server action to get current user's watchlist symbols (uses session)
 export async function getCurrentUserWatchlist(): Promise<string[]> {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    const email = session?.user?.email;
-    
+    const email = await getCurrentSessionEmail();
     if (!email) {
       return [];
     }
@@ -88,19 +92,12 @@ export async function saveWatchlistItem(email: string, symbol: string, company: 
   const sanitizedCompany = sanitizeCompanyName(company);
 
   try {
-    const mongoose = await connectToDatabase();
-    const db = mongoose.connection.db;
-    if (!db) throw new Error('MongoDB connection not found');
-
-    const user = await db.collection('user').findOne<{ _id?: unknown; id?: string; email?: string }>({ email });
-    if (!user) {
+    const userId = await getUserIdByEmail(email);
+    if (!userId) {
       return { success: false, error: 'User not found' };
     }
 
-    const userId = (user.id as string) || String(user._id || '');
-    if (!userId) return { success: false, error: 'User ID not found' };
-
-    const updated = await Watchlist.findOneAndUpdate(
+    await Watchlist.findOneAndUpdate(
       { userId, symbol: normalizedSymbol },
       {
         userId,
@@ -130,17 +127,10 @@ export async function removeWatchlistItem(email: string, symbol: string): Promis
   }
 
   try {
-    const mongoose = await connectToDatabase();
-    const db = mongoose.connection.db;
-    if (!db) throw new Error('MongoDB connection not found');
-
-    const user = await db.collection('user').findOne<{ _id?: unknown; id?: string; email?: string }>({ email });
-    if (!user) {
+    const userId = await getUserIdByEmail(email);
+    if (!userId) {
       return { success: false, error: 'User not found' };
     }
-
-    const userId = (user.id as string) || String(user._id || '');
-    if (!userId) return { success: false, error: 'User ID not found' };
 
     await Watchlist.deleteOne({ userId, symbol: normalizedSymbol });
 
@@ -153,9 +143,7 @@ export async function removeWatchlistItem(email: string, symbol: string): Promis
 
 export async function removeCurrentUserWatchlistItem(symbol: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    const email = session?.user?.email;
-    
+    const email = await getCurrentSessionEmail();
     if (!email) {
       return { success: false, error: 'Not authenticated' };
     }
